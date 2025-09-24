@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quiz Lite — Excel Upload</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0b1020;
+      --card: #141a2d;
+      --muted: #99a3c7;
+      --text: #e8ecff;
+      --brand: #6ea8fe;
+      --brand-2: #a5f3fc;
+      --ok: #34d399;
+      --warn: #f59e0b;
+      --err: #ef4444;
+      --shadow: 0 10px 30px rgba(0,0,0,.25);
+      --radius: 16px;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; background: radial-gradient(1200px 800px at 80% -10%, #123,#000), var(--bg);
+      color: var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; letter-spacing:.2px;
+    }
+    header {
+      position: sticky; top: 0; z-index: 10;
+      background: rgba(10,15,30,.65); backdrop-filter: blur(10px);
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .wrap { max-width: 1050px; margin: 0 auto; padding: 18px 20px; }
+    .brand { display:flex; align-items:center; gap:12px; font-weight:700; font-size:18px; }
+    .logo { width: 34px; height: 34px; border-radius: 10px; background: linear-gradient(135deg, var(--brand), var(--brand-2)); box-shadow: var(--shadow); display:grid; place-items:center; font-weight:800; color:#06121a; }
+    .grid { display: grid; grid-template-columns: 1fr; gap: 18px; }
+    @media (min-width: 900px) { .grid { grid-template-columns: 1.2fr .8fr; } }
+    .card { background: linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.08); border-radius: var(--radius); box-shadow: var(--shadow); }
+    .card > .head { padding: 16px 18px; border-bottom:1px solid rgba(255,255,255,.08); display:flex; align-items:center; justify-content:space-between; gap:10px; }
+    .card > .body { padding: 18px; }
+    h1 { margin: 0; font-size: 18px; }
+    p { color: var(--muted); }
+    .muted { color: var(--muted); }
+    .row { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+    .btn { appearance: none; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.04); color: var(--text); padding: 10px 14px; border-radius: 12px; cursor: pointer; font-weight:600; transition:.15s ease; }
+    .btn:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.22); }
+    .btn.brand { background: linear-gradient(135deg, var(--brand), var(--brand-2)); color: #06121a; border-color: transparent; }
+    .btn.ok { background: linear-gradient(135deg, #22c55e, #86efac); color:#052e1e; border-color:transparent; }
+    .btn.warn { background: linear-gradient(135deg, #f59e0b, #fde68a); color:#2a1800; border-color:transparent; }
+    .btn.ghost { background: transparent; border-color: rgba(255,255,255,.18); }
+    .btn.small { padding: 7px 10px; font-size: 13px; }
+    input[type="file"] { display:none; }
+    .filelabel { border: 1px dashed rgba(255,255,255,.18); padding: 16px; border-radius: 14px; display:flex; align-items:center; gap:10px; cursor:pointer; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+    .table { width:100%; border-collapse: collapse; font-size: 14px; }
+    .table th, .table td { border-bottom: 1px solid rgba(255,255,255,.08); padding: 8px 10px; text-align:left; }
+    .table th { color: #b8c1ff; font-weight:700; }
+    .badge { padding: 3px 8px; border-radius: 999px; font-size: 12px; border:1px solid rgba(255,255,255,.15); color: var(--muted); }
+    .kpi { display:grid; grid-template-columns: repeat(2,1fr); gap:12px; }
+    @media (min-width: 600px) { .kpi { grid-template-columns: repeat(4,1fr);} }
+    .kpi .box { background: rgba(255,255,255,.03); border:1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 14px; }
+    .kpi .num { font-weight: 800; font-size: 22px; }
+    .options { display:grid; gap:12px; }
+    @media (min-width: 600px){ .options { grid-template-columns:1fr 1fr; } }
+    .opt { padding:14px; border:1px solid rgba(255,255,255,.12); border-radius:12px; cursor:pointer; background: rgba(255,255,255,.03); }
+    .opt:hover { border-color: rgba(255,255,255,.22); transform: translateY(-1px); }
+    .opt.correct { background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.4); }
+    .opt.wrong { background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.4); }
+    .timer { height: 8px; background: rgba(255,255,255,.12); border-radius: 999px; overflow:hidden; }
+    .timer > div { height:100%; width:100%; background: linear-gradient(90deg, #22c55e, #f59e0b, #ef4444); transition: width .2s linear; }
+    .hidden { display:none !important; }
+    .footnote { font-size: 12px; color: var(--muted); }
+    .center { text-align:center; }
+  </style>
+  <!-- SheetJS for reading & writing Excel -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="wrap row" style="justify-content: space-between;">
+      <div class="brand"><div class="logo">QZ</div> Quiz Lite</div>
+      <div class="row">
+        <button class="btn ghost small" id="btnShowBank">Bank Soal</button>
+        <button class="btn ghost small" id="btnShowMaker">Buat Soal</button>
+        <button class="btn ghost small" id="btnShowQuiz">Kerjakan</button>
+        <button class="btn ok small" id="btnReset">Reset</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap" style="padding: 22px 20px 60px;">
+    <div class="grid">
+      <!-- Left: Controls / Builder / Upload -->
+      <section class="card" id="panelControls">
+        <div class="head">
+          <h1>Persiapan Kuis</h1>
+          <span class="badge" id="badgeQCount">0 soal</span>
+        </div>
+        <div class="body">
+          <p>Impor soal dari Excel (.xlsx) atau buat manual di bawah. Format Excel tersedia lewat tombol Template.</p>
+          <div class="row" style="margin-bottom:14px;">
+            <button class="btn brand" id="btnTemplate">Download Template Excel</button>
+            <label class="filelabel" for="excelFile">
+              <input id="excelFile" type="file" accept=".xlsx,.xls" />
+              <strong>Upload Excel</strong>
+              <span class="muted">(seret & lepas juga bisa)</span>
+            </label>
+          </div>
+
+          <div class="row" style="margin: 12px 0;">
+            <label class="row" style="gap:8px; align-items:center;">
+              <input type="checkbox" id="shuffleToggle"> Acak urutan soal
+            </label>
+            <label class="row" style="gap:8px; align-items:center;">
+              <input type="checkbox" id="showCorrectAfter"> Tampilkan benar/salah langsung
+            </label>
+          </div>
+
+          <hr style="border:none; border-top:1px solid rgba(255,255,255,.08); margin: 16px 0;">
+
+          <h3 style="margin:0 0 8px;">Buat Soal Manual</h3>
+          <form id="makerForm" class="row" onsubmit="return false;">
+            <input class="btn" style="flex:1;" id="qText" placeholder="Teks pertanyaan" />
+            <input class="btn" style="width:150px;" id="qA" placeholder="Opsi A" />
+            <input class="btn" style="width:150px;" id="qB" placeholder="Opsi B" />
+            <input class="btn" style="width:150px;" id="qC" placeholder="Opsi C" />
+            <input class="btn" style="width:150px;" id="qD" placeholder="Opsi D" />
+            <select class="btn" id="qCorrect" style="width:120px;">
+              <option value="A">Benar: A</option>
+              <option value="B">Benar: B</option>
+              <option value="C">Benar: C</option>
+              <option value="D">Benar: D</option>
+            </select>
+            <input class="btn" id="qPoints" type="number" min="1" value="1" style="width:110px;" title="Bobot skor"/>
+            <input class="btn" id="qTime" type="number" min="0" value="0" style="width:110px;" title="Batas waktu (detik, opsional)"/>
+            <button class="btn ok" id="btnAdd">Tambah</button>
+          </form>
+
+          <div style="margin-top:10px;" class="footnote">Kolom waktu <em>(detik)</em> bernilai 0 = tanpa timer. Bobot default = 1.
+          </div>
+        </div>
+      </section>
+
+      <!-- Right: Bank / Stats -->
+      <aside class="card" id="panelBank">
+        <div class="head">
+          <h1>Bank Soal (Pratinjau)</h1>
+          <div class="row">
+            <button class="btn small ghost" id="btnClear">Hapus Semua</button>
+            <button class="btn small warn" id="btnExport">Export Bank → Excel</button>
+          </div>
+        </div>
+        <div class="body">
+          <div class="kpi" style="margin-bottom:12px;">
+            <div class="box"><div class="muted">Soal</div><div class="num" id="kpiQ">0</div></div>
+            <div class="box"><div class="muted">Total Bobot</div><div class="num" id="kpiPts">0</div></div>
+            <div class="box"><div class="muted">Dengan Timer</div><div class="num" id="kpiTimed">0</div></div>
+            <div class="box"><div class="muted">Tanpa Timer</div><div class="num" id="kpiNoTime">0</div></div>
+          </div>
+          <div style="max-height: 300px; overflow:auto; border:1px solid rgba(255,255,255,.08); border-radius:12px;">
+            <table class="table" id="bankTable">
+              <thead>
+                <tr>
+                  <th>#</th><th>Pertanyaan</th><th>A</th><th>B</th><th>C</th><th>D</th><th>Benar</th><th>Bobot</th><th>Waktu</th><th>Aksi</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="row" style="justify-content: flex-end; margin-top:12px;">
+            <button class="btn brand" id="btnStart">Mulai Kuis</button>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Quiz Panel -->
+    <section class="card hidden" id="panelQuiz" style="margin-top:18px;">
+      <div class="head">
+        <h1 id="quizTitle">Kerjakan Kuis</h1>
+        <div class="row">
+          <span class="badge" id="progressBadge">0/0</span>
+          <span class="badge" id="scoreBadge">Skor: 0</span>
+        </div>
+      </div>
+      <div class="body">
+        <div class="timer hidden" id="timer"><div></div></div>
+        <h2 id="qDisplay" style="margin: 12px 0 16px;"></h2>
+        <div class="options" id="options"></div>
+        <div class="row" style="justify-content: space-between; margin-top: 16px;">
+          <div class="muted" id="feedback"></div>
+          <div class="row">
+            <button class="btn ghost" id="btnPrev">Sebelumnya</button>
+            <button class="btn brand" id="btnNext">Berikutnya</button>
+            <button class="btn ok" id="btnFinish">Selesai</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Result Panel -->
+    <section class="card hidden" id="panelResult" style="margin-top:18px;">
+      <div class="head">
+        <h1>Hasil Kuis</h1>
+        <span class="badge" id="finalBadge">-</span>
+      </div>
+      <div class="body">
+        <p id="resultSummary"></p>
+        <div style="max-height: 320px; overflow:auto; border:1px solid rgba(255,255,255,.08); border-radius:12px;">
+          <table class="table" id="resultTable">
+            <thead>
+              <tr>
+                <th>#</th><th>Pertanyaan</th><th>Jawaban</th><th>Kunci</th><th>Status</th><th>Bobot</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div class="row" style="justify-content: flex-end; margin-top:12px;">
+          <button class="btn warn" id="btnDownloadCSV">Download CSV Hasil</button>
+          <button class="btn brand" id="btnRetry">Ulangi</button>
+        </div>
+      </div>
+    </section>
+
+    <div class="footnote center" style="margin-top: 16px;">Format Excel: Kolom <span class="mono">Question, Option A, Option B, Option C, Option D, Correct (A-D), Points (angka), Time (detik)</span></div>
+  </main>
+
+<script>
+// ----- State -----
+let BANK = []; // { q, A, B, C, D, correct, points, time }
+let QUIZ = { order: [], idx: 0, score: 0, answers: {}, totalPoints: 0 };
+let settings = { shuffle: false, showCorrectAfter: false };
+let timer = { secs: 0, remain: 0, handle: null };
+
+// ----- Helpers -----
+const $ = sel => document.querySelector(sel);
+const $$ = sel => [...document.querySelectorAll(sel)];
+const el = (tag, cls, html) => { const x = document.createElement(tag); if (cls) x.className = cls; if (html!=null) x.innerHTML = html; return x; };
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmt = (n) => new Intl.NumberFormat('id-ID').format(n);
+
+function updateKPIs() {
+  $('#badgeQCount').textContent = `${BANK.length} soal`;
+  $('#kpiQ').textContent = BANK.length;
+  const pts = BANK.reduce((s,x)=>s+(Number(x.points)||1),0);
+  $('#kpiPts').textContent = pts;
+  $('#kpiTimed').textContent = BANK.filter(x=>Number(x.time)>0).length;
+  $('#kpiNoTime').textContent = BANK.filter(x=>!Number(x.time)).length;
+}
+
+function renderBank() {
+  const tb = $('#bankTable tbody');
+  tb.innerHTML = '';
+  BANK.forEach((x,i)=>{
+    const tr = el('tr');
+    tr.append(
+      el('td','', i+1),
+      el('td','', x.q||''), el('td','', x.A||''), el('td','', x.B||''), el('td','', x.C||''), el('td','', x.D||''),
+      el('td','', x.correct||''), el('td','', x.points||1), el('td','', x.time||0),
+      (()=>{ const td=el('td'); const b=el('button','btn small ghost','Hapus'); b.onclick=()=>{ BANK.splice(i,1); renderBank(); updateKPIs(); }; td.append(b); return td;})()
+    );
+    tb.appendChild(tr);
+  });
+}
+
+function bankFromSheet(sheet) {
+  const rows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+  const out = [];
+  rows.forEach((r, idx)=>{
+    // Flexible headers
+    const q = r['Question'] || r['Pertanyaan'] || r['Soal'] || '';
+    const A = r['Option A'] || r['A'] || '';
+    const B = r['Option B'] || r['B'] || '';
+    const C = r['Option C'] || r['C'] || '';
+    const D = r['Option D'] || r['D'] || '';
+    const correct = (r['Correct']||r['Kunci']||'').toString().trim().toUpperCase();
+    const points = Number(r['Points']||r['Bobot']||1) || 1;
+    const time = Number(r['Time']||r['Waktu']||0) || 0;
+    if (!q || !A || !B || !C || !D || !'ABCD'.includes(correct)) return; // skip bad rows
+    out.push({ q, A, B, C, D, correct, points, time });
+  });
+  return out;
+}
+
+function makeTemplateExcel() {
+  const data = [
+    ['Question','Option A','Option B','Option C','Option D','Correct','Points','Time'],
+    ['Contoh: Ibukota Indonesia adalah?','Jakarta','Bandung','Surabaya','Medan','A',1,0]
+  ];
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Template');
+  XLSX.writeFile(wb, 'quiz_template.xlsx');
+}
+
+function exportBankExcel() {
+  const data = [['Question','Option A','Option B','Option C','Option D','Correct','Points','Time']];
+  BANK.forEach(x=> data.push([x.q,x.A,x.B,x.C,x.D,x.correct,x.points,x.time]));
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Bank');
+  XLSX.writeFile(wb, 'quiz_bank.xlsx');
+}
+
+function startQuiz() {
+  if (!BANK.length) { alert('Bank soal kosong. Upload Excel atau tambah manual.'); return; }
+  QUIZ.order = BANK.map((_,i)=>i);
+  if (settings.shuffle) QUIZ.order.sort(()=>Math.random()-0.5);
+  QUIZ.idx = 0; QUIZ.score = 0; QUIZ.answers = {}; QUIZ.totalPoints = BANK.reduce((s,x)=>s+(Number(x.points)||1),0);
+  $('#panelQuiz').classList.remove('hidden');
+  $('#panelResult').classList.add('hidden');
+  showQuestion();
+}
+
+function showQuestion() {
+  const qi = QUIZ.order[QUIZ.idx];
+  const q = BANK[qi];
+  $('#quizTitle').textContent = `Kerjakan Kuis`;
+  $('#progressBadge').textContent = `${QUIZ.idx+1}/${QUIZ.order.length}`;
+  $('#scoreBadge').textContent = `Skor: ${fmt(QUIZ.score)} / ${fmt(QUIZ.totalPoints)}`;
+  $('#qDisplay').textContent = q.q;
+  $('#feedback').textContent = '';
+  const opts = $('#options'); opts.innerHTML = '';
+  ['A','B','C','D'].forEach(letter=>{
+    const div = el('div','opt');
+    div.dataset.letter = letter;
+    div.innerHTML = `<strong>${letter}.</strong> ${q[letter]}`;
+    div.onclick = ()=> selectAnswer(letter);
+    if (QUIZ.answers[qi]) {
+      const chosen = QUIZ.answers[qi].choice;
+      if (settings.showCorrectAfter) {
+        if (letter===q.correct) div.classList.add('correct');
+        if (letter===chosen && chosen!==q.correct) div.classList.add('wrong');
+      } else if (letter===chosen) {
+        div.style.borderColor = 'rgba(255,255,255,.5)';
+      }
+    }
+    opts.appendChild(div);
+  });
+
+  // Timer
+  clearInterval(timer.handle); timer.handle = null;
+  if (Number(q.time)>0) {
+    $('#timer').classList.remove('hidden');
+    timer.secs = q.time; timer.remain = q.time;
+    updateTimerBar();
+    timer.handle = setInterval(()=>{
+      timer.remain = clamp(timer.remain-0.2, 0, timer.secs);
+      updateTimerBar();
+      if (timer.remain<=0) { clearInterval(timer.handle); timer.handle=null; autoNextOnTimeout(); }
+    }, 200);
+  } else {
+    $('#timer').classList.add('hidden');
+  }
+
+  // Buttons
+  $('#btnPrev').disabled = (QUIZ.idx===0);
+  $('#btnNext').disabled = (QUIZ.idx===QUIZ.order.length-1);
+}
+
+function updateTimerBar(){
+  const pct = (timer.remain/timer.secs)*100;
+  $('#timer > div').style.width = pct + '%';
+}
+
+function autoNextOnTimeout(){
+  const qi = QUIZ.order[QUIZ.idx];
+  if (!QUIZ.answers[qi]) { // mark unanswered
+    QUIZ.answers[qi] = { choice: '-', correct: BANK[qi].correct, points: 0, status: 'Waktu habis' };
+  }
+  if (QUIZ.idx < QUIZ.order.length-1) {
+    QUIZ.idx++; showQuestion();
+  } else finishQuiz();
+}
+
+function selectAnswer(letter){
+  const qi = QUIZ.order[QUIZ.idx];
+  const q = BANK[qi];
+  const chosen = letter;
+  const correct = q.correct;
+  const points = (chosen===correct) ? (Number(q.points)||1) : 0;
+  const status = (chosen===correct) ? 'Benar' : 'Salah';
+
+  // adjust score delta if changed answer
+  const prev = QUIZ.answers[qi];
+  if (prev) { QUIZ.score -= (prev.points||0); }
+  QUIZ.score += points;
+
+  QUIZ.answers[qi] = { choice: chosen, correct, points, status };
+
+  if (settings.showCorrectAfter) {
+    $$('#options .opt').forEach(d=>{
+      d.classList.remove('correct','wrong');
+      if (d.dataset.letter===correct) d.classList.add('correct');
+      if (d.dataset.letter===chosen && chosen!==correct) d.classList.add('wrong');
+    });
+    $('#feedback').textContent = status + (points? ` (+${points})`:'');
+  }
+  $('#scoreBadge').textContent = `Skor: ${fmt(QUIZ.score)} / ${fmt(QUIZ.totalPoints)}`;
+}
+
+function nextQ(){ if (QUIZ.idx < QUIZ.order.length-1){ QUIZ.idx++; showQuestion(); } }
+function prevQ(){ if (QUIZ.idx > 0){ QUIZ.idx--; showQuestion(); } }
+
+function finishQuiz(){
+  clearInterval(timer.handle); timer.handle=null;
+  // Fill unanswered
+  QUIZ.order.forEach((qi)=>{
+    if (!QUIZ.answers[qi]) QUIZ.answers[qi] = { choice: '-', correct: BANK[qi].correct, points:0, status:'Kosong' };
+  });
+  const total = QUIZ.totalPoints;
+  const score = QUIZ.score;
+  const pct = (total>0) ? Math.round(score*100/total) : 0;
+  $('#finalBadge').textContent = `Nilai: ${score}/${total} (${pct}%)`;
+  $('#resultSummary').innerHTML = `Anda menjawab <strong>${fmt(score)}</strong> dari <strong>${fmt(total)}</strong> poin (`+pct+`%).`;
+  // Table
+  const tb = $('#resultTable tbody'); tb.innerHTML='';
+  QUIZ.order.forEach((qi,i)=>{
+    const q = BANK[qi]; const ans = QUIZ.answers[qi];
+    const tr = el('tr');
+    tr.append(
+      el('td','', i+1),
+      el('td','', q.q),
+      el('td','', ans.choice),
+      el('td','', q.correct),
+      el('td','', ans.status),
+      el('td','', ans.points)
+    );
+    tb.appendChild(tr);
+  });
+  $('#panelResult').classList.remove('hidden');
+  $('#panelQuiz').classList.add('hidden');
+}
+
+function downloadCSV(){
+  const rows = [['#','Question','Answer','Correct','Status','Points']];
+  QUIZ.order.forEach((qi,i)=>{
+    const q=BANK[qi], a=QUIZ.answers[qi];
+    rows.push([i+1, q.q, a.choice, q.correct, a.status, a.points]);
+  });
+  const csv = rows.map(r=> r.map(v=>`"${(v??'').toString().replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'quiz_result.csv'; a.click();
+}
+
+// ----- UI Wiring -----
+$('#btnTemplate').onclick = makeTemplateExcel;
+$('#btnExport').onclick = exportBankExcel;
+$('#btnStart').onclick = startQuiz;
+$('#btnNext').onclick = nextQ;
+$('#btnPrev').onclick = prevQ;
+$('#btnFinish').onclick = finishQuiz;
+$('#btnRetry').onclick = ()=>{ $('#panelResult').classList.add('hidden'); $('#panelQuiz').classList.remove('hidden'); QUIZ.idx=0; QUIZ.score=0; QUIZ.answers={}; showQuestion(); };
+$('#btnDownloadCSV').onclick = downloadCSV;
+$('#btnReset').onclick = ()=>{ if(confirm('Hapus semua soal & reset kuis?')){ BANK=[]; renderBank(); updateKPIs(); $('#panelQuiz').classList.add('hidden'); $('#panelResult').classList.add('hidden'); } };
+$('#btnClear').onclick = ()=>{ if(confirm('Hapus semua soal di bank?')){ BANK=[]; renderBank(); updateKPIs(); } };
+$('#shuffleToggle').onchange = (e)=>{ settings.shuffle = !!e.target.checked; };
+$('#showCorrectAfter').onchange = (e)=>{ settings.showCorrectAfter = !!e.target.checked; };
+$('#btnShowBank').onclick = ()=>{ window.scrollTo({ top: 0, behavior: 'smooth' }); };
+$('#btnShowMaker').onclick = ()=>{ document.getElementById('qText').focus(); };
+$('#btnShowQuiz').onclick = ()=>{ startQuiz(); window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }); };
+
+// Add manual question
+$('#btnAdd').onclick = ()=>{
+  const q = $('#qText').value.trim(); const A=$('#qA').value.trim(); const B=$('#qB').value.trim(); const C=$('#qC').value.trim(); const D=$('#qD').value.trim();
+  const correct = $('#qCorrect').value; const points = Number($('#qPoints').value)||1; const time = Number($('#qTime').value)||0;
+  if (!q || !A || !B || !C || !D) { alert('Lengkapi pertanyaan dan semua opsi.'); return; }
+  BANK.push({ q, A, B, C, D, correct, points, time });
+  ['#qText','#qA','#qB','#qC','#qD'].forEach(s=>$(s).value='');
+  $('#qPoints').value = 1; $('#qTime').value = 0; $('#qCorrect').value='A';
+  renderBank(); updateKPIs();
+};
+
+// Excel file upload
+const fileInput = $('#excelFile');
+fileInput.addEventListener('change', handleFile, false);
+
+// Drag & Drop
+const dropZone = document.body; // whole page
+;['dragenter','dragover','dragleave','drop'].forEach(ev=>{
+  dropZone.addEventListener(ev, e=>{ e.preventDefault(); e.stopPropagation(); }, false);
+});
+dropZone.addEventListener('drop', e=>{
+  const dt = e.dataTransfer; const files = dt.files;
+  if (files && files[0]) processExcel(files[0]);
+});
+
+function handleFile(e){ const file = e.target.files[0]; if (file) processExcel(file); }
+
+function processExcel(file){
+  const reader = new FileReader();
+  reader.onload = (evt)=>{
+    const data = new Uint8Array(evt.target.result);
+    const wb = XLSX.read(data, { type: 'array' });
+    const first = wb.Sheets[wb.SheetNames[0]];
+    const rows = bankFromSheet(first);
+    if (!rows.length) { alert('Tidak ada baris valid. Pastikan header sesuai Template.'); return; }
+    BANK = BANK.concat(rows);
+    renderBank(); updateKPIs();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// Init
+updateKPIs();
+renderBank();
+</script>
+</body>
+</html>
